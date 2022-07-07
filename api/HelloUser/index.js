@@ -18,71 +18,51 @@ const cca = new msal.ConfidentialClientApplication(config);
 module.exports = async function (context, req) {
     context.log('JavaScript HTTP trigger function processed a request.');
 
-    const ssoToken = (req.body && req.body.ssoToken);
-
-    try {
-        const isAuthorized = await validateAccessToken(ssoToken);
-
-        if (isAuthorized) {
-            const oboRequest = {
-                oboAssertion: ssoToken,
-                scopes: ['User.Read'],
-            }
-
-            try {
-                let response = await cca.acquireTokenOnBehalfOf(oboRequest);
-
-                if (response.accessToken) {
-                    try {
-                        let apiResponse = await callResourceAPI(response.accessToken, 'https://graph.microsoft.com/v1.0/me');
-
-                        return context.res = {
-                            status: 200,
-                            body: {
-                                response: apiResponse,
-                            },
-                            headers: {
-                                'Content-Type': 'application/json'
-                            }
-                        };
-                    } catch (error) {
-                        context.log(error);
-
-                        return context.res = {
-                            status: 401,
-                            body: {
-                                response: "No access token"
-                            }
-                        };
-                    }
-                }
-            } catch (error) {
-                context.log(error);
-
-                return context.res = {
-                    status: 500,
-                    body: {
-                        response: JSON.stringify(error),
-                    }
-                };
-            }
-        } else {
-            context.res = {
-                status: 401,
-                body: {
-                    response: "Invalid token"
-                }
-            };
+    let [isAuthorizedError, responseError, apiResponseError] = []
+    const ssoToken = (req.body && req.body.ssoToken)
+    
+    const isAuthorized = await validateAccessToken(ssoToken)
+      .catch(e=>context.log('isAuthorized', isAuthorizedError=e)) 
+    if(!isAuthorized) {
+      return context.res = {
+        status: 500,
+          body: {
+              response: JSON.stringify(isAuthorizedError),
+          }
+      }
+    }
+    
+    let response = await cca.acquireTokenOnBehalfOf({ oboAssertion: ssoToken,
+      scopes: ['User.Read']}) 
+      .catch(e=>context.log('response', responseError=e)) 
+    if(!response?.accessToken) {
+      return context.res = {
+        status: 500,
+        body: {
+            response: JSON.stringify(responseError),
         }
-    } catch (error) {
-        context.log(error);
+      }
+    }
+    
+    let apiResponse = await callResourceAPI(response.accessToken, 'https://graph.microsoft.com/v1.0/me')
+      .catch(e=>context.log('apiResponse', apiResponseError=e)) 
+    if(!apiResponse){
+      return context.res = {
+        status: 401,
+        body: {
+            response: "No access token"//,apiResponseError??
+          }
+      }
+    }
 
-        context.res = {
-            status: 500,
-            body: {
-                response: JSON.stringify(error),
-            }
-        };
+    return context.res = {
+        status: 200,
+        body: {
+            response: apiResponse,
+        },
+        headers: {
+            'Content-Type': 'application/json'
+        }
     }
 }
 
