@@ -24,6 +24,7 @@ module.exports = async function (context, req) {
     const isAuthorized = await validateAccessToken(ssoToken)
       .catch(e=>context.log('isAuthorized', isAuthorizedError=e)) 
     if(!isAuthorized) {
+      console.log("not authorized")
       return context.res = {
         status: 500,
           body: {
@@ -36,6 +37,7 @@ module.exports = async function (context, req) {
       scopes: ['User.Read']}) 
       .catch(e=>context.log('response', responseError=e)) 
     if(!response?.accessToken) {
+      console.log('no response')
       return context.res = {
         status: 500,
         body: {
@@ -47,6 +49,7 @@ module.exports = async function (context, req) {
     let apiResponse = await callResourceAPI(response.accessToken, 'https://graph.microsoft.com/v1.0/me')
       .catch(e=>context.log('apiResponse', apiResponseError=e)) 
     if(!apiResponse){
+      console.log('no api response')
       return context.res = {
         status: 401,
         body: {
